@@ -1,0 +1,17 @@
+
+# Environment dan konfigurasi rahasia
+.env
+.env.*
+!.env.example
+
+# Go build
+*.exe
+*.out
+*.test
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.log
