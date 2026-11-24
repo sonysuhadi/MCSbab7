@@ -1,27 +1,89 @@
-# MCS BAB 7 – Servo API
+# MCS BAB 7 – Membangun REST API Servo dengan Golang dan PostgreSQL
 
-REST API sederhana untuk mengelola status servo menggunakan Golang, Gin Framework, dan PostgreSQL.
+Tutorial lengkap membangun REST API untuk mengelola status servo menggunakan Golang, Gin Framework, dan PostgreSQL.
 
-Project ini dibuat untuk praktikum BAB 7 dengan menerapkan konsep RESTful API serta pemisahan kode menggunakan Controller, Repository, dan Entity.
+Tutorial ini dimulai dari instalasi tools, pembuatan project, penulisan kode setiap file, konfigurasi database, menjalankan server, hingga pengujian menggunakan Postman.
 
 ---
 
-## 1. Teknologi yang Digunakan
+# DAFTAR ISI
 
-| Teknologi | Fungsi |
+1. Persiapan Tools
+2. Instalasi Golang
+3. Membuat Project
+4. Membuat Struktur Folder
+5. Inisialisasi Go Module
+6. Instalasi Dependencies
+7. Membuat Entity
+8. Membuat Database dan Migrasi
+9. Membuat Repository
+10. Membuat Controller
+11. Membuat Router
+12. Membuat Main Program
+13. Konfigurasi PostgreSQL
+14. Menjalankan Aplikasi
+15. Pengujian Menggunakan Postman
+16. Memeriksa Database
+17. Troubleshooting
+
+---
+
+# 1. Persiapan Tools
+
+Sebelum memulai, siapkan beberapa aplikasi berikut:
+
+| Tools | Kegunaan |
 |---|---|
 | Golang | Bahasa pemrograman |
-| Gin Gonic | Framework REST API |
+| Visual Studio Code | Editor kode |
 | PostgreSQL | Database |
-| pgAdmin 4 | Manajemen database |
-| lib/pq | Driver PostgreSQL |
-| sql-migrate | Migrasi database |
-| Postman | Pengujian API |
+| pgAdmin 4 | Mengelola database |
+| Postman | Menguji REST API |
+| Git | Version control |
 
-## 2. Struktur Project
+Pastikan seluruh aplikasi sudah terinstal.
+
+# 2. Instalasi Golang
+
+Unduh Golang melalui:
+
+https://go.dev/dl/
+
+Setelah instalasi selesai, buka CMD atau PowerShell.
+
+Periksa versi Golang:
+
+```bash
+go version
+```
+
+Jika berhasil, versi Golang akan ditampilkan.
+
+# 3. Membuat Project
+
+Buat folder project bernama `bab7`.
+
+Contoh lokasi:
 
 ```text
-MCSbab7/
+C:\Users\sony\Documents\app flutter\bab7
+```
+
+Buka folder tersebut menggunakan Visual Studio Code.
+
+Caranya:
+
+1. Buka Visual Studio Code.
+2. Pilih File → Open Folder.
+3. Pilih folder `bab7`.
+4. Buka terminal dengan Ctrl + `.
+
+# 4. Membuat Struktur Folder
+
+Buat folder dan file dengan struktur berikut:
+
+```text
+bab7/
 ├── controllers/
 │   └── servo_controller.go
 ├── database/
@@ -36,134 +98,512 @@ MCSbab7/
 │   └── servo_router.go
 ├── go.mod
 ├── go.sum
-├── main.go
-└── README.md
+└── main.go
 ```
 
-## 3. Persiapan
+Fungsi masing-masing folder:
 
-Sebelum menjalankan project, pastikan sudah menginstal:
+- `controllers`: Mengatur request dan response API.
+- `database`: Mengatur koneksi dan migrasi database.
+- `entities`: Menentukan struktur data servo.
+- `repositories`: Menjalankan query SQL.
+- `routers`: Mengatur endpoint API.
+- `main.go`: Program utama untuk menjalankan server.
 
-1. Go (Golang).
-2. PostgreSQL.
-3. pgAdmin 4.
-4. Git.
-5. Postman.
-6. Visual Studio Code (opsional).
+# 5. Inisialisasi Go Module
 
-Periksa instalasi Go melalui terminal:
+Buka terminal pada folder project.
+
+Jalankan:
 
 ```bash
-go version
+go mod init bab7
 ```
 
-Periksa Git:
+Perintah ini membuat file `go.mod` sebagai identitas module Go.
+
+# 6. Instalasi Dependencies
+
+Jalankan:
 
 ```bash
-git --version
+go get github.com/gin-gonic/gin
+go get github.com/lib/pq
+go get github.com/rubenv/sql-migrate
 ```
 
-## 4. Instalasi Project
+Keterangan:
 
-### Langkah 1 – Clone Repository
+- Gin digunakan untuk membuat REST API.
+- lib/pq digunakan sebagai driver PostgreSQL.
+- sql-migrate digunakan untuk migrasi database.
 
-Buka CMD atau terminal, kemudian jalankan:
+# 7. Membuat Entity
 
-```bash
-git clone https://github.com/Sonysuhadi/MCSbab7.git
+Buka folder `entities`.
+
+Buat file:
+
+`servo_entity.go`
+
+Isi kode:
+
+```go
+package entities
+
+type Servo struct {
+    Id          int `json:"id"`
+    StatusServo int `json:"srv_status"`
+}
 ```
 
-Masuk ke folder project:
+Penjelasan:
 
-```bash
-cd MCSbab7
+- `Id` digunakan sebagai identitas data servo.
+- `StatusServo` digunakan untuk menyimpan nilai status servo.
+- JSON tag menentukan nama properti pada respons JSON.
+
+# 8. Membuat Database dan Migrasi
+
+## A. Membuat file database.go
+
+Masuk ke folder `database`.
+
+Buat file:
+
+`database.go`
+
+Isi kode:
+
+```go
+package database
+
+import (
+    "database/sql"
+    "embed"
+    "fmt"
+
+    migrate "github.com/rubenv/sql-migrate"
+)
+
+//go:embed sql_migrations/*.sql
+var dbMigrations embed.FS
+
+var DbConnection *sql.DB
+
+func DBMigrations(dbParam *sql.DB) error {
+    migrations := &migrate.EmbedFileSystemMigrationSource{
+        FileSystem: dbMigrations,
+        Root:       "sql_migrations",
+    }
+
+    n, err := migrate.Exec(
+        dbParam,
+        "postgres",
+        migrations,
+        migrate.Up,
+    )
+
+    if err != nil {
+        return fmt.Errorf("gagal menjalankan migrasi: %w", err)
+    }
+
+    DbConnection = dbParam
+
+    fmt.Printf("Migrasi berhasil dijalankan: %d migrasi\n", n)
+
+    return nil
+}
 ```
 
-### Langkah 2 – Instal Dependensi
+Penjelasan:
 
-Jalankan perintah:
+- `embed.FS` digunakan untuk membaca file migrasi.
+- `go:embed` menyertakan file SQL ke dalam aplikasi.
+- `migrate.Exec` menjalankan migrasi database.
+- `DbConnection` menyimpan koneksi database yang digunakan aplikasi.
 
-```bash
-go mod tidy
+## B. Membuat file migrasi SQL
+
+Masuk ke:
+
+`database/sql_migrations/`
+
+Buat file:
+
+`1_initiate.sql`
+
+Isi:
+
+```sql
+-- +migrate Up
+-- +migrate StatementBegin
+
+CREATE TABLE servo (
+    id INTEGER PRIMARY KEY,
+    status_servo INTEGER
+);
+
+-- +migrate StatementEnd
 ```
 
-Perintah tersebut digunakan untuk mengunduh dependensi yang dibutuhkan oleh project.
+Penjelasan:
 
-## 5. Konfigurasi Database PostgreSQL
+- `CREATE TABLE servo` membuat tabel servo.
+- `id` menjadi primary key.
+- `status_servo` menyimpan nilai status servo.
 
-### Langkah 1 – Membuka pgAdmin
+Tabel yang dihasilkan:
 
-1. Jalankan PostgreSQL.
-2. Buka pgAdmin 4.
-3. Hubungkan ke server PostgreSQL.
-4. Klik kanan pada bagian Databases.
-5. Pilih Create → Database.
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| id | INTEGER | Primary Key |
+| status_servo | INTEGER | Status servo |
 
-### Langkah 2 – Membuat Database
+# 9. Membuat Repository
 
-Buat database dengan nama:
+Masuk ke folder `repositories`.
+
+Buat file:
+
+`servo_repo.go`
+
+Isi kode:
+
+```go
+package repositories
+
+import (
+    "bab7/entities"
+    "database/sql"
+)
+
+func InitProj(db *sql.DB) (err error) {
+    query := "INSERT INTO servo (id, status_servo) VALUES (1, 0) ON CONFLICT (id) DO NOTHING"
+    _, err = db.Exec(query)
+    return err
+}
+
+func GetStatus(db *sql.DB) (result []entities.Servo, err error) {
+    query := "SELECT id, status_servo FROM servo"
+    rows, err := db.Query(query)
+
+    if err != nil {
+        return
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var data entities.Servo
+
+        err = rows.Scan(&data.Id, &data.StatusServo)
+        if err != nil {
+            return
+        }
+
+        result = append(result, data)
+    }
+
+    err = rows.Err()
+    return
+}
+
+func UpdateStatus(db *sql.DB, status entities.Servo) (err error) {
+    query := "UPDATE servo SET status_servo = $1 WHERE id = 1"
+    _, err = db.Exec(query, status.StatusServo)
+    return
+}
+```
+
+Penjelasan fungsi:
+
+**InitProj**
+
+Membuat data awal servo dengan ID 1 dan status 0. Jika data sudah ada, data tidak dibuat ulang.
+
+**GetStatus**
+
+Mengambil data servo dari PostgreSQL.
+
+**UpdateStatus**
+
+Memperbarui nilai status servo berdasarkan ID 1.
+
+# 10. Membuat Controller
+
+Masuk ke folder `controllers`.
+
+Buat file:
+
+`servo_controller.go`
+
+Isi kode:
+
+```go
+package controllers
+
+import (
+    "bab7/database"
+    "bab7/entities"
+    "bab7/repositories"
+    "net/http"
+    "strconv"
+
+    "github.com/gin-gonic/gin"
+)
+
+func InitProj(c *gin.Context) {
+    err := repositories.InitProj(database.DbConnection)
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{})
+}
+
+func GetStatus(c *gin.Context) {
+    var result gin.H
+
+    status, err := repositories.GetStatus(database.DbConnection)
+
+    if err != nil {
+        result = gin.H{
+            "result": err.Error(),
+        }
+    } else {
+        result = gin.H{
+            "result": status,
+        }
+    }
+
+    c.JSON(http.StatusOK, result)
+}
+
+func UpdateStatus(c *gin.Context) {
+    var status entities.Servo
+
+    srv_status, _ := strconv.Atoi(c.Param("srv_status"))
+    status.StatusServo = srv_status
+
+    err := repositories.UpdateStatus(database.DbConnection, status)
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "StatusServo": status.StatusServo,
+    })
+}
+```
+
+Penjelasan:
+
+- `InitProj`: Menginisialisasi data servo.
+- `GetStatus`: Mengambil status servo.
+- `UpdateStatus`: Mengubah status servo berdasarkan parameter URL.
+
+# 11. Membuat Router
+
+Masuk ke folder `routers`.
+
+Buat file:
+
+`servo_router.go`
+
+Isi kode:
+
+```go
+package routers
+
+import (
+    "bab7/controllers"
+
+    "github.com/gin-gonic/gin"
+)
+
+func StartServer() *gin.Engine {
+    routers := gin.Default()
+
+    routers.POST(
+        "/servo/init-proj",
+        controllers.InitProj,
+    )
+
+    routers.GET(
+        "/servo/status",
+        controllers.GetStatus,
+    )
+
+    routers.PUT(
+        "/servo/update/:srv_status",
+        controllers.UpdateStatus,
+    )
+
+    return routers
+}
+```
+
+Penjelasan:
+
+Router digunakan untuk menghubungkan endpoint HTTP dengan fungsi controller.
+
+# 12. Membuat Main Program
+
+Buka file:
+
+`main.go`
+
+Isi dengan kode berikut:
+
+```go
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "log"
+    "os"
+
+    "bab7/database"
+    "bab7/routers"
+
+    _ "github.com/lib/pq"
+)
+
+func main() {
+    const port = ":50001"
+
+    host := "localhost"
+    dbPort := 5432
+    user := "postgres"
+    dbName := "bab7"
+    password := os.Getenv("DB_PASSWORD")
+
+    if password == "" {
+        log.Fatal("Environment variable DB_PASSWORD belum diatur")
+    }
+
+    psqlInfo := fmt.Sprintf(
+        "host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+        host,
+        dbPort,
+        user,
+        password,
+        dbName,
+    )
+
+    DB, err := sql.Open("postgres", psqlInfo)
+    if err != nil {
+        log.Fatal("Gagal membuka database: ", err)
+    }
+    defer DB.Close()
+
+    err = DB.Ping()
+    if err != nil {
+        log.Fatal("Gagal menghubungkan PostgreSQL: ", err)
+    }
+
+    fmt.Println("DB berhasil tersambung")
+
+    err = database.DBMigrations(DB)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Server berjalan di port ", port)
+
+    err = routers.StartServer().Run(port)
+    if err != nil {
+        log.Fatal("Gagal menjalankan server: ", err)
+    }
+}
+```
+
+**Catatan:** Versi ini menggunakan environment variable agar password tidak ditulis langsung dalam source code. Pastikan mengganti `main.go` lokal dan memperbarui file tersebut di GitHub.
+
+# 13. Konfigurasi PostgreSQL
+
+Buka pgAdmin 4.
+
+Buat database baru dengan nama:
 
 ```text
 bab7
 ```
 
-Atau jalankan SQL berikut:
+Atau melalui Query Tool:
 
 ```sql
 CREATE DATABASE bab7;
 ```
 
-### Langkah 3 – Konfigurasi Koneksi
+Pastikan PostgreSQL berjalan pada port 5432.
 
-Buka file `main.go`.
+## Mengatur password database di Windows
 
-Sesuaikan konfigurasi database dengan PostgreSQL yang digunakan:
+Jika menggunakan PowerShell:
 
-| Parameter | Nilai |
-|---|---|
-| Host | localhost |
-| Port | 5432 |
-| User | postgres |
-| Password | Password PostgreSQL masing-masing |
-| Database | bab7 |
+```powershell
+$env:DB_PASSWORD="PASSWORD_POSTGRESQL_KAMU"
+```
 
-Pastikan konfigurasi koneksi sesuai dengan PostgreSQL lokal.
+Jika menggunakan CMD:
 
-**Catatan keamanan:** Jangan mengunggah password database atau kredensial pribadi ke repository publik.
+```cmd
+set DB_PASSWORD=PASSWORD_POSTGRESQL_KAMU
+```
 
-## 6. Menjalankan Aplikasi
+Gunakan password PostgreSQL lokal milik masing-masing. Jangan memasukkan password ke README atau GitHub.
 
-Setelah konfigurasi database selesai, buka terminal pada direktori project.
+# 14. Menjalankan Aplikasi
+
+Pastikan terminal berada di folder project.
 
 Jalankan:
+
+```bash
+go mod tidy
+```
+
+Kemudian:
 
 ```bash
 go run main.go
 ```
 
-Jika berhasil, terminal akan menampilkan informasi seperti:
+Jika berhasil, output kurang lebih:
 
 ```text
 DB berhasil tersambung
 Migrasi berhasil dijalankan: 1 migrasi
 Server berjalan di port :50001
 
-[GIN-debug] POST   /servo/init-proj
-[GIN-debug] GET    /servo/status
-[GIN-debug] PUT    /servo/update/:srv_status
+[GIN-debug] POST /servo/init-proj
+[GIN-debug] GET /servo/status
+[GIN-debug] PUT /servo/update/:srv_status
 
 [GIN-debug] Listening and serving HTTP on :50001
 ```
 
-Artinya:
-- PostgreSQL berhasil terhubung.
-- Migrasi database berhasil dijalankan.
-- Endpoint API berhasil didaftarkan.
-- Server berjalan pada port 50001.
+Server sekarang aktif pada:
 
-Biarkan terminal tetap berjalan selama melakukan pengujian API.
+```text
+http://localhost:50001
+```
 
-## 7. Pengujian REST API Menggunakan Postman
+Biarkan terminal tetap terbuka selama pengujian.
+
+# 15. Pengujian API Menggunakan Postman
+
+Buka Postman dan buat request baru.
 
 Base URL:
 
@@ -171,84 +611,70 @@ Base URL:
 http://localhost:50001
 ```
 
-### A. Inisialisasi Data Servo
+## A. Inisialisasi Data Servo
 
-Metode: POST
+Method:
 
-Endpoint:
+```text
+POST
+```
+
+URL:
 
 ```text
 http://localhost:50001/servo/init-proj
 ```
 
-Langkah pengujian:
-
-1. Buka Postman.
-2. Buat request baru.
-3. Pilih metode POST.
-4. Masukkan URL endpoint.
-5. Klik Send.
+Klik Send.
 
 Fungsi: Membuat data awal servo dengan ID 1 dan status 0.
 
-Query database yang digunakan:
+## B. Melihat Status Servo
 
-```sql
-INSERT INTO servo (id, status_servo)
-VALUES (1, 0)
-ON CONFLICT (id) DO NOTHING;
+Method:
+
+```text
+GET
 ```
 
-### B. Melihat Status Servo
-
-Metode: GET
-
-Endpoint:
+URL:
 
 ```text
 http://localhost:50001/servo/status
 ```
 
-Langkah pengujian:
+Klik Send.
 
-1. Buat request baru.
-2. Pilih metode GET.
-3. Masukkan URL endpoint.
-4. Klik Send.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
     "result": [
         {
-            "Id": 1,
-            "StatusServo": 0
+            "id": 1,
+            "srv_status": 0
         }
     ]
 }
 ```
 
-Fungsi: Mengambil data servo yang tersimpan di PostgreSQL.
+## C. Memperbarui Status Servo
 
-### C. Memperbarui Status Servo
+Method:
 
-Metode: PUT
+```text
+PUT
+```
 
-Endpoint:
+URL:
 
 ```text
 http://localhost:50001/servo/update/90
 ```
 
-Langkah pengujian:
+Klik Send.
 
-1. Buat request baru.
-2. Pilih metode PUT.
-3. Masukkan URL endpoint.
-4. Klik Send.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
@@ -256,15 +682,15 @@ Contoh respons:
 }
 ```
 
-Fungsi: Mengubah nilai status servo menjadi 90.
+Angka 90 merupakan contoh nilai status servo yang akan disimpan.
 
-Angka 90 pada URL dapat diganti dengan nilai lain sesuai kebutuhan pengujian.
+# 16. Memeriksa Database
 
-## 8. Memeriksa Data di PostgreSQL
+Buka pgAdmin 4.
 
-Buka pgAdmin 4, kemudian pilih database `bab7`.
+Pilih database `bab7`, kemudian buka Query Tool.
 
-Buka Query Tool dan jalankan:
+Jalankan:
 
 ```sql
 SELECT * FROM servo;
@@ -276,57 +702,60 @@ Contoh hasil:
 |---|---|
 | 1 | 90 |
 
-Nilai pada database akan berubah sesuai request PUT yang dikirim melalui Postman.
+Jika nilai status berubah menjadi 90, berarti proses UPDATE berhasil.
 
-## 9. Alur Kerja Aplikasi
+# 17. Alur Kerja Aplikasi
 
 ```text
-Postman
-   |
-   v
-Gin Router
-   |
-   v
-Controller
-   |
-   v
-Repository
-   |
-   v
-PostgreSQL
-   |
-   v
-Response JSON
+        POSTMAN
+           |
+           v
+      GIN ROUTER
+           |
+           v
+       CONTROLLER
+           |
+           v
+       REPOSITORY
+           |
+           v
+       POSTGRESQL
+           |
+           v
+      RESPONSE JSON
 ```
 
 Penjelasan:
 
 1. Postman mengirimkan HTTP request.
-2. Gin Router mengarahkan request ke controller.
-3. Controller memproses parameter dan memanggil repository.
-4. Repository menjalankan query SQL ke PostgreSQL.
-5. Database mengembalikan hasil.
-6. API mengirimkan respons dalam format JSON.
+2. Gin Router menerima dan mengarahkan request.
+3. Controller memproses request.
+4. Repository menjalankan query SQL.
+5. PostgreSQL menyimpan atau mengambil data.
+6. API mengirimkan response dalam format JSON.
 
-## 10. Troubleshooting
+# 18. Troubleshooting
 
-| Masalah | Solusi |
+| Error | Penyebab dan solusi |
 |---|---|
-| Database connection failed | Periksa PostgreSQL, port, username, dan password |
-| Relation servo does not exist | Pastikan migrasi database berhasil |
-| Column statusservo does not exist | Gunakan nama kolom status_servo |
-| Connection refused | Pastikan PostgreSQL sedang berjalan |
-| Port already in use | Periksa apakah port 50001 digunakan aplikasi lain |
-| Go module error | Jalankan `go mod tidy` |
-
-## 11. GitHub
-
-Repository: https://github.com/Sonysuhadi/MCSbab7
-
-Developer: **Sony Kurniawan Suhadi**
+| `DB berhasil tersambung` tidak muncul | Periksa koneksi PostgreSQL dan password |
+| `column statusservo does not exist` | Pastikan query menggunakan `status_servo` |
+| `relation servo does not exist` | Pastikan migrasi database berhasil |
+| `connection refused` | Pastikan PostgreSQL sedang berjalan |
+| `port already in use` | Periksa penggunaan port 50001 |
+| `go.mod` error | Jalankan `go mod tidy` |
+| `DB_PASSWORD belum diatur` | Atur environment variable sebelum menjalankan aplikasi |
 
 ---
 
-**MCS BAB 7 – Servo API**
+# Repository GitHub
+
+Source code project:
+
+https://github.com/Sonysuhadi/MCSbab7
+
+Developer: **Sony Kurniawan Suhadi**
+
+Project: **MCS BAB 7 – Servo API**
 
 Built with Golang, Gin Framework, and PostgreSQL.
