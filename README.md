@@ -1,18 +1,24 @@
 # MCS BAB 7 – Servo API
 
-Aplikasi REST API sederhana untuk mengelola status servo menggunakan **Golang**, **Gin Framework**, dan **PostgreSQL**.
+REST API sederhana untuk mengelola status servo menggunakan Golang, Gin Framework, dan PostgreSQL.
 
-Project ini dibuat sebagai implementasi praktikum BAB 7 dengan konsep RESTful API dan pemisahan kode menggunakan arsitektur sederhana berbasis Controller, Repository, dan Entity.
+Project ini dibuat untuk praktikum BAB 7 dengan menerapkan konsep RESTful API serta pemisahan kode menggunakan Controller, Repository, dan Entity.
 
-## Teknologi yang Digunakan
+---
 
-- **Golang** – Bahasa pemrograman utama.
-- **Gin Gonic** – Framework untuk membangun REST API.
-- **PostgreSQL** – Database relasional.
-- **lib/pq** – Driver PostgreSQL untuk Go.
-- **sql-migrate** – Mengelola migrasi database.
+## 1. Teknologi yang Digunakan
 
-## Struktur Project
+| Teknologi | Fungsi |
+|---|---|
+| Golang | Bahasa pemrograman |
+| Gin Gonic | Framework REST API |
+| PostgreSQL | Database |
+| pgAdmin 4 | Manajemen database |
+| lib/pq | Driver PostgreSQL |
+| sql-migrate | Migrasi database |
+| Postman | Pengujian API |
+
+## 2. Struktur Project
 
 ```text
 MCSbab7/
@@ -34,69 +40,130 @@ MCSbab7/
 └── README.md
 ```
 
-## Persyaratan
+## 3. Persiapan
 
-Pastikan perangkat sudah memiliki:
+Sebelum menjalankan project, pastikan sudah menginstal:
 
-- Go
-- PostgreSQL
-- Git
-- Postman (untuk pengujian API)
+1. Go (Golang).
+2. PostgreSQL.
+3. pgAdmin 4.
+4. Git.
+5. Postman.
+6. Visual Studio Code (opsional).
 
-## Instalasi dan Konfigurasi
+Periksa instalasi Go melalui terminal:
 
-### 1. Clone Repository
+```bash
+go version
+```
+
+Periksa Git:
+
+```bash
+git --version
+```
+
+## 4. Instalasi Project
+
+### Langkah 1 – Clone Repository
+
+Buka CMD atau terminal, kemudian jalankan:
 
 ```bash
 git clone https://github.com/Sonysuhadi/MCSbab7.git
 ```
 
-Masuk ke direktori project:
+Masuk ke folder project:
 
 ```bash
 cd MCSbab7
 ```
 
-### 2. Instal Dependensi
+### Langkah 2 – Instal Dependensi
+
+Jalankan perintah:
 
 ```bash
 go mod tidy
 ```
 
-### 3. Buat Database
+Perintah tersebut digunakan untuk mengunduh dependensi yang dibutuhkan oleh project.
 
-Buka PostgreSQL atau pgAdmin, kemudian buat database dengan nama:
+## 5. Konfigurasi Database PostgreSQL
+
+### Langkah 1 – Membuka pgAdmin
+
+1. Jalankan PostgreSQL.
+2. Buka pgAdmin 4.
+3. Hubungkan ke server PostgreSQL.
+4. Klik kanan pada bagian Databases.
+5. Pilih Create → Database.
+
+### Langkah 2 – Membuat Database
+
+Buat database dengan nama:
+
+```text
+bab7
+```
+
+Atau jalankan SQL berikut:
 
 ```sql
 CREATE DATABASE bab7;
 ```
 
-### 4. Konfigurasi Database
+### Langkah 3 – Konfigurasi Koneksi
 
-Sesuaikan konfigurasi koneksi PostgreSQL di `main.go` dengan pengaturan PostgreSQL lokal:
+Buka file `main.go`.
 
-- Host: localhost
-- Port: 5432
-- User: postgres
-- Database: bab7
+Sesuaikan konfigurasi database dengan PostgreSQL yang digunakan:
 
-Pastikan password database sesuai dengan konfigurasi PostgreSQL milik masing-masing.
+| Parameter | Nilai |
+|---|---|
+| Host | localhost |
+| Port | 5432 |
+| User | postgres |
+| Password | Password PostgreSQL masing-masing |
+| Database | bab7 |
 
-### 5. Jalankan Aplikasi
+Pastikan konfigurasi koneksi sesuai dengan PostgreSQL lokal.
+
+**Catatan keamanan:** Jangan mengunggah password database atau kredensial pribadi ke repository publik.
+
+## 6. Menjalankan Aplikasi
+
+Setelah konfigurasi database selesai, buka terminal pada direktori project.
+
+Jalankan:
 
 ```bash
 go run main.go
 ```
 
-Jika berhasil, server berjalan pada:
+Jika berhasil, terminal akan menampilkan informasi seperti:
 
 ```text
-http://localhost:50001
+DB berhasil tersambung
+Migrasi berhasil dijalankan: 1 migrasi
+Server berjalan di port :50001
+
+[GIN-debug] POST   /servo/init-proj
+[GIN-debug] GET    /servo/status
+[GIN-debug] PUT    /servo/update/:srv_status
+
+[GIN-debug] Listening and serving HTTP on :50001
 ```
 
-Migrasi database akan dijalankan secara otomatis ketika aplikasi dimulai.
+Artinya:
+- PostgreSQL berhasil terhubung.
+- Migrasi database berhasil dijalankan.
+- Endpoint API berhasil didaftarkan.
+- Server berjalan pada port 50001.
 
-## API Endpoints
+Biarkan terminal tetap berjalan selama melakukan pengujian API.
+
+## 7. Pengujian REST API Menggunakan Postman
 
 Base URL:
 
@@ -104,67 +171,162 @@ Base URL:
 http://localhost:50001
 ```
 
-| Method | Endpoint | Fungsi |
-|---|---|---|
-| POST | `/servo/init-proj` | Inisialisasi data servo |
-| GET | `/servo/status` | Mengambil status servo |
-| PUT | `/servo/update/:srv_status` | Memperbarui status servo |
+### A. Inisialisasi Data Servo
 
-### 1. Inisialisasi Servo
+Metode: POST
 
-```http
-POST /servo/init-proj
+Endpoint:
+
+```text
+http://localhost:50001/servo/init-proj
 ```
 
-Digunakan untuk membuat data awal servo dengan ID 1 dan status 0.
+Langkah pengujian:
 
-### 2. Mendapatkan Status Servo
+1. Buka Postman.
+2. Buat request baru.
+3. Pilih metode POST.
+4. Masukkan URL endpoint.
+5. Klik Send.
 
-```http
-GET /servo/status
+Fungsi: Membuat data awal servo dengan ID 1 dan status 0.
+
+Query database yang digunakan:
+
+```sql
+INSERT INTO servo (id, status_servo)
+VALUES (1, 0)
+ON CONFLICT (id) DO NOTHING;
 ```
 
-Digunakan untuk mengambil data status servo dari database.
+### B. Melihat Status Servo
 
-### 3. Memperbarui Status Servo
+Metode: GET
 
-```http
-PUT /servo/update/90
+Endpoint:
+
+```text
+http://localhost:50001/servo/status
 ```
 
-Digunakan untuk memperbarui status servo menjadi 90.
+Langkah pengujian:
 
-Angka pada URL merupakan nilai status yang akan disimpan.
+1. Buat request baru.
+2. Pilih metode GET.
+3. Masukkan URL endpoint.
+4. Klik Send.
 
-## Database
+Contoh respons:
 
-Tabel yang digunakan:
+```json
+{
+    "result": [
+        {
+            "Id": 1,
+            "StatusServo": 0
+        }
+    ]
+}
+```
 
-**Table: `servo`**
+Fungsi: Mengambil data servo yang tersimpan di PostgreSQL.
 
-| Kolom | Tipe Data | Keterangan |
-|---|---|---|
-| id | INTEGER | Primary Key |
-| status_servo | INTEGER | Nilai status servo |
+### C. Memperbarui Status Servo
 
-## Pengujian API
+Metode: PUT
 
-Pengujian endpoint dapat dilakukan menggunakan Postman dengan metode HTTP:
+Endpoint:
 
-- POST untuk inisialisasi.
-- GET untuk mengambil status.
-- PUT untuk memperbarui status.
+```text
+http://localhost:50001/servo/update/90
+```
 
-## Developer
+Langkah pengujian:
 
-**Sony Kurniawan Suhadi**
+1. Buat request baru.
+2. Pilih metode PUT.
+3. Masukkan URL endpoint.
+4. Klik Send.
 
-GitHub: [@Sonysuhadi](https://github.com/Sonysuhadi)
+Contoh respons:
 
-Repository: [MCSbab7](https://github.com/Sonysuhadi/MCSbab7)
+```json
+{
+    "StatusServo": 90
+}
+```
+
+Fungsi: Mengubah nilai status servo menjadi 90.
+
+Angka 90 pada URL dapat diganti dengan nilai lain sesuai kebutuhan pengujian.
+
+## 8. Memeriksa Data di PostgreSQL
+
+Buka pgAdmin 4, kemudian pilih database `bab7`.
+
+Buka Query Tool dan jalankan:
+
+```sql
+SELECT * FROM servo;
+```
+
+Contoh hasil:
+
+| id | status_servo |
+|---|---|
+| 1 | 90 |
+
+Nilai pada database akan berubah sesuai request PUT yang dikirim melalui Postman.
+
+## 9. Alur Kerja Aplikasi
+
+```text
+Postman
+   |
+   v
+Gin Router
+   |
+   v
+Controller
+   |
+   v
+Repository
+   |
+   v
+PostgreSQL
+   |
+   v
+Response JSON
+```
+
+Penjelasan:
+
+1. Postman mengirimkan HTTP request.
+2. Gin Router mengarahkan request ke controller.
+3. Controller memproses parameter dan memanggil repository.
+4. Repository menjalankan query SQL ke PostgreSQL.
+5. Database mengembalikan hasil.
+6. API mengirimkan respons dalam format JSON.
+
+## 10. Troubleshooting
+
+| Masalah | Solusi |
+|---|---|
+| Database connection failed | Periksa PostgreSQL, port, username, dan password |
+| Relation servo does not exist | Pastikan migrasi database berhasil |
+| Column statusservo does not exist | Gunakan nama kolom status_servo |
+| Connection refused | Pastikan PostgreSQL sedang berjalan |
+| Port already in use | Periksa apakah port 50001 digunakan aplikasi lain |
+| Go module error | Jalankan `go mod tidy` |
+
+## 11. GitHub
+
+Repository: https://github.com/Sonysuhadi/MCSbab7
+
+Developer: **Sony Kurniawan Suhadi**
 
 ---
 
 **MCS BAB 7 – Servo API**
 
-Built with Go, Gin, and PostgreSQL.
+Built with Golang, Gin Framework, and PostgreSQL.
