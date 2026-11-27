@@ -1,123 +1,24 @@
-# MCS BAB 7 – Kontrol Motor Servo Menggunakan ESP32, Go, dan PostgreSQL
+# MCS BAB 7 – Kontrol Motor Servo Menggunakan Go dan PostgreSQL
 
-## 1. Persiapan
+Project ini merupakan implementasi REST API menggunakan bahasa pemrograman Go (Golang) dan database PostgreSQL untuk mengelola data status motor servo.
 
-Project ini menggunakan bahasa pemrograman Go sebagai REST API dan PostgreSQL sebagai database untuk menyimpan nilai sudut motor servo.
+Go digunakan untuk membuat REST API menggunakan framework Gin, sedangkan PostgreSQL digunakan untuk menyimpan data status servo. Pengujian dilakukan menggunakan Postman untuk mengirim perintah, membaca data, dan memperbarui status servo.
 
-Pengujian dilakukan menggunakan Postman untuk mengirim perintah, membaca status, dan memperbarui nilai sudut servo.
+## 1. Teknologi yang Digunakan
 
-### Software yang dibutuhkan
-
-- Go
+- Go (Golang)
+- Gin Framework
 - PostgreSQL
 - pgAdmin 4
 - Visual Studio Code
 - Postman
+- sql-migrate
+- lib/pq
 
-### Perangkat yang digunakan pada keseluruhan project
-
-- ESP32
-- Motor Servo SG90
-- Kabel jumper
-- Sumber daya 5V untuk servo
-
-**Catatan:** Panduan ini hanya membahas backend Go, PostgreSQL, dan pengujian API menggunakan Postman. Pemrograman Arduino dan ESP32 tidak termasuk dalam pembahasan.
-
----
-
-## 2. Membuat Database PostgreSQL
-
-Pada tahap ini, kita akan membuat database menggunakan pgAdmin 4.
-
-### Langkah 1 – Membuka pgAdmin 4
-
-1. Buka aplikasi pgAdmin 4.
-2. Pada bagian kiri, buka menu **Servers**.
-3. Pilih server PostgreSQL yang digunakan.
-4. Jika diminta, masukkan password PostgreSQL.
-
-### Langkah 2 – Membuat Database
-
-1. Klik kanan pada menu **Databases**.
-2. Pilih **Create**.
-3. Klik **Database**.
-4. Masukkan nama database:
+## 2. Struktur Project
 
 ```text
-bab7
-```
-
-5. Pada bagian Owner, pilih `postgres`.
-6. Klik **Save**.
-
-### Langkah 3 – Memastikan Database Berhasil Dibuat
-
-Pada panel sebelah kiri pgAdmin, buka:
-
-```text
-Servers
-└── PostgreSQL
-    └── Databases
-        └── bab7
-```
-
-Jika database `bab7` muncul, berarti proses pembuatan database berhasil.
-
-### Langkah 4 – Membuka Query Tool
-
-1. Klik database `bab7`.
-2. Klik kanan pada database tersebut.
-3. Pilih **Query Tool**.
-
-Query Tool digunakan untuk menjalankan perintah SQL dan memeriksa isi database.
-
-**Catatan:** Tabel `servo` tidak perlu dibuat secara manual karena akan dibuat otomatis oleh program Go melalui proses database migration.
-
----
-
-## 3. Membuat Project Go
-
-### Langkah 1 – Membuat Folder Project
-
-Buka terminal atau PowerShell, kemudian jalankan:
-
-```powershell
-mkdir bab7
-cd bab7
-```
-
-### Langkah 2 – Inisialisasi Project
-
-Jalankan perintah:
-
-```bash
-go mod init bab7
-```
-
-Perintah tersebut digunakan untuk membuat file `go.mod` sebagai identitas module project Go.
-
-### Langkah 3 – Menginstal Library
-
-Jalankan perintah berikut:
-
-```bash
-go get github.com/gin-gonic/gin
-go get github.com/lib/pq
-go get github.com/rubenv/sql-migrate
-```
-
-Fungsi masing-masing library:
-
-- `gin-gonic/gin`: Membuat REST API dan mengatur routing.
-- `lib/pq`: Driver untuk menghubungkan Go dengan PostgreSQL.
-- `sql-migrate`: Mengelola pembuatan dan perubahan struktur database melalui migration.
-
-### Langkah 4 – Membuat Struktur Folder
-
-Buat struktur folder dan file seperti berikut:
-
-```text
-bab7/
+MCSbab7/
 │
 ├── controllers/
 │   └── servo_controller.go
@@ -136,20 +37,55 @@ bab7/
 ├── routers/
 │   └── servo_router.go
 │
+├── .gitignore
 ├── go.mod
 ├── go.sum
-└── main.go
+├── main.go
+└── README.md
 ```
 
-Setiap folder memiliki fungsi masing-masing untuk memisahkan proses pengelolaan data, koneksi database, pengaturan API, dan struktur data.
+## 3. Membuat Database PostgreSQL
 
----
+1. Buka aplikasi pgAdmin 4.
+2. Masuk ke menu Servers.
+3. Pilih server PostgreSQL.
+4. Klik kanan Databases.
+5. Pilih Create → Database.
+6. Masukkan nama database:
 
-## 4. Memasukkan Kode Program Go
+```text
+bab7
+```
 
-Masukkan kode berikut sesuai dengan nama file masing-masing.
+7. Pada bagian Owner, pilih `postgres`.
+8. Klik Save.
 
-### A. `entities/servo_entity.go`
+Tabel `servo` akan dibuat secara otomatis melalui proses database migration ketika program Go dijalankan.
+
+## 4. Inisialisasi Project Go
+
+Buka terminal pada folder project.
+
+### A. Inisialisasi Module
+
+```bash
+go mod init bab7
+```
+
+### B. Instalasi Library
+
+```bash
+go get github.com/gin-gonic/gin
+go get github.com/lib/pq
+go get github.com/rubenv/sql-migrate
+go get -u "github.com/gin-contrib/cors"
+```
+
+## 5. Kode Program
+
+Masukkan kode berikut sesuai dengan struktur folder project.
+
+### A. entities/servo_entity.go
 
 ```go
 package entities
@@ -160,16 +96,9 @@ type Servo struct {
 }
 ```
 
-**Fungsi:**
+Fungsi: Menentukan struktur data servo yang terdiri dari ID dan nilai sudut servo.
 
-File ini digunakan untuk menentukan struktur data servo yang terdiri dari:
-
-- `Id`: Identitas data servo.
-- `StatusServo`: Nilai sudut motor servo.
-
-Tag JSON digunakan agar nama field yang dikirim melalui API sesuai dengan format JSON.
-
-### B. `database/database.go`
+### B. database/database.go
 
 ```go
 package database
@@ -213,20 +142,13 @@ func DBMigrations(dbParam *sql.DB) error {
 }
 ```
 
-**Fungsi:**
+Fungsi:
+- Menghubungkan aplikasi dengan database PostgreSQL.
+- Membaca file SQL migration.
+- Menjalankan migration secara otomatis.
+- Menyimpan koneksi database pada `DbConnection`.
 
-File ini digunakan untuk menghubungkan proses migration dengan database PostgreSQL.
-
-Penjelasan:
-
-- `embed`: Memasukkan file SQL migration ke dalam program Go.
-- `dbMigrations`: Menyimpan file migration.
-- `DbConnection`: Menyimpan koneksi database yang digunakan oleh aplikasi.
-- `migrate.Exec()`: Menjalankan proses migration secara otomatis.
-
-Dengan demikian, tabel database dapat dibuat tanpa harus menjalankan perintah SQL secara manual setiap kali project dijalankan.
-
-### C. `database/sql_migrations/1_initiate.sql`
+### C. database/sql_migrations/1_initiate.sql
 
 ```sql
 -- +migrate Up
@@ -249,26 +171,14 @@ DROP TABLE servo;
 -- +migrate StatementEnd
 ```
 
-**Fungsi:**
-
-File ini digunakan untuk membuat tabel `servo` di PostgreSQL.
-
-Penjelasan struktur tabel:
+Fungsi: Membuat tabel `servo` pada PostgreSQL.
 
 | Kolom | Tipe Data | Fungsi |
 |---|---|---|
 | id | INTEGER | Identitas data servo |
 | status_servo | INTEGER | Menyimpan nilai sudut servo |
 
-Keterangan tambahan:
-
-- `PRIMARY KEY`: Menentukan kolom ID sebagai identitas utama.
-- `DEFAULT 0`: Memberikan nilai awal sudut servo sebesar 0.
-- `CHECK`: Membatasi nilai sudut antara 0 sampai 180 derajat.
-- `Up`: Menjalankan pembuatan tabel.
-- `Down`: Menghapus tabel ketika migration dibatalkan.
-
-### D. `repositories/servo_repo.go`
+### D. repositories/servo_repo.go
 
 ```go
 package repositories
@@ -361,17 +271,12 @@ func UpdateStatus(db *sql.DB, status entities.Servo) error {
 }
 ```
 
-**Fungsi:**
+Fungsi:
+- `InitProj()`: Membuat data awal servo dengan ID 1 dan nilai 0.
+- `GetStatus()`: Mengambil data servo dari PostgreSQL.
+- `UpdateStatus()`: Memperbarui nilai sudut servo.
 
-Repository merupakan bagian yang bertanggung jawab untuk berkomunikasi langsung dengan database.
-
-Terdapat tiga fungsi utama:
-
-1. `InitProj()`: Membuat data awal servo dengan ID 1 dan sudut 0. Jika data sudah tersedia, data tidak dibuat ulang.
-2. `GetStatus()`: Mengambil data ID dan nilai sudut servo dari database.
-3. `UpdateStatus()`: Memperbarui nilai sudut servo pada database.
-
-### E. `controllers/servo_controller.go`
+### E. controllers/servo_controller.go
 
 ```go
 package controllers
@@ -467,21 +372,12 @@ func UpdateStatus(c *gin.Context) {
 }
 ```
 
-**Fungsi:**
+Fungsi:
+- `InitProj()`: Menginisialisasi data servo.
+- `GetStatus()`: Mengambil status servo.
+- `UpdateStatus()`: Memperbarui status servo berdasarkan parameter URL.
 
-Controller bertugas menerima permintaan dari pengguna, memanggil repository, dan mengirimkan hasil dalam format JSON.
-
-Terdapat tiga fungsi:
-
-- `InitProj()`: Memanggil proses pembuatan data awal.
-- `GetStatus()`: Mengambil status servo dari database.
-- `UpdateStatus()`: Menerima dan memperbarui nilai sudut servo.
-
-Pada bagian `UpdateStatus()`, terdapat validasi agar nilai yang dikirim hanya berupa angka antara 0 sampai 180.
-
-Jika nilai tidak sesuai, API akan mengembalikan pesan kesalahan dengan HTTP 400.
-
-### F. `routers/servo_router.go`
+### F. routers/servo_router.go
 
 ```go
 package routers
@@ -515,11 +411,9 @@ func StartServer() *gin.Engine {
 }
 ```
 
-**Fungsi:**
+Fungsi: Mengatur endpoint REST API dan menghubungkannya dengan controller.
 
-File router digunakan untuk menentukan alamat API dan menghubungkannya dengan controller.
-
-Terdapat tiga endpoint:
+Endpoint yang tersedia:
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
@@ -527,7 +421,7 @@ Terdapat tiga endpoint:
 | GET | `/servo/status` | Melihat status servo |
 | PUT | `/servo/update/:srv_status` | Memperbarui sudut servo |
 
-### G. `main.go`
+### G. main.go
 
 ```go
 package main
@@ -536,9 +430,6 @@ import (
     "database/sql"
     "fmt"
     "log"
-    "net"
-    "net/url"
-    "os"
 
     "bab7/database"
     "bab7/routers"
@@ -546,141 +437,89 @@ import (
     _ "github.com/lib/pq"
 )
 
-func getEnv(key, fallback string) string {
-
-    value := os.Getenv(key)
-
-    if value == "" {
-        return fallback
-    }
-
-    return value
-}
+const (
+    host     = "localhost"
+    port     = 5432
+    user     = "postgres"
+    password = "PASSWORD_POSTGRESQL_KAMU"
+    dbName   = "bab7"
+)
 
 func main() {
 
-    dbHost := getEnv("DB_HOST", "localhost")
-    dbPort := getEnv("DB_PORT", "5432")
-    dbUser := getEnv("DB_USER", "postgres")
-    dbName := getEnv("DB_NAME", "bab7")
-    dbPassword := os.Getenv("DB_PASSWORD")
+    PORT := ":50001"
 
-    if dbPassword == "" {
-        log.Fatal("Environment variable DB_PASSWORD belum diatur")
-    }
+    psqlInfo := fmt.Sprintf(
+        "host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+        host,
+        port,
+        user,
+        password,
+        dbName,
+    )
 
-    port := ":50001"
-
-    dbURL := url.URL{
-        Scheme: "postgres",
-        User: url.UserPassword(
-            dbUser,
-            dbPassword,
-        ),
-        Host: net.JoinHostPort(dbHost, dbPort),
-        Path: dbName,
-    }
-
-    query := dbURL.Query()
-    query.Set("sslmode", "disable")
-    dbURL.RawQuery = query.Encode()
-
-    DB, err := sql.Open("postgres", dbURL.String())
+    // Membuka koneksi database
+    DB, err := sql.Open("postgres", psqlInfo)
 
     if err != nil {
-        log.Fatal("Gagal membuka koneksi database:", err)
+        log.Fatal("Gagal membuka database: ", err)
     }
 
     defer DB.Close()
 
+    // Memeriksa koneksi PostgreSQL
     err = DB.Ping()
 
     if err != nil {
-        log.Fatal("Database gagal tersambung:", err)
+        log.Fatal("Gagal menghubungkan PostgreSQL: ", err)
     }
 
     fmt.Println("DB berhasil tersambung")
 
+    // Menjalankan migrasi database
     err = database.DBMigrations(DB)
 
     if err != nil {
-        log.Fatal("Migrasi gagal:", err)
+        log.Fatal(err)
     }
 
-    fmt.Println("Server berjalan di port", port)
+    // Menjalankan server Gin
+    fmt.Println("Server berjalan di port ", PORT)
 
-    err = routers.StartServer().Run(port)
+    err = routers.StartServer().Run(PORT)
 
     if err != nil {
-        log.Fatal("Server gagal dijalankan:", err)
+        log.Fatal("Gagal menjalankan server: ", err)
     }
 }
 ```
 
-**Fungsi:**
-
-File `main.go` merupakan program utama yang menjalankan seluruh proses aplikasi.
-
-Tahapan yang dilakukan:
-
-1. Membaca konfigurasi database dari environment variable.
-2. Membuat koneksi ke PostgreSQL.
-3. Memastikan koneksi database berhasil melalui `DB.Ping()`.
+Fungsi:
+1. Mengatur konfigurasi koneksi PostgreSQL.
+2. Membuka koneksi database.
+3. Memeriksa koneksi menggunakan `DB.Ping()`.
 4. Menjalankan database migration.
 5. Menjalankan REST API menggunakan Gin pada port `50001`.
 
-**Penting:** Password PostgreSQL tidak ditulis langsung di dalam kode program. Password dibaca melalui environment variable `DB_PASSWORD` agar tidak mudah terekspos ketika project dibagikan atau diunggah ke GitHub.
+**Catatan:** Ganti `PASSWORD_POSTGRESQL_KAMU` dengan password PostgreSQL lokal. Jangan memasukkan password asli ke repository publik.
 
----
+## 6. Menjalankan Program
 
-## 5. Menjalankan dan Menguji Program Go
+Pastikan PostgreSQL sudah aktif dan database `bab7` sudah tersedia.
 
-### Langkah 1 – Mengatur Password PostgreSQL
-
-Sebelum menjalankan program, buka PowerShell pada folder project.
-
-Masukkan perintah:
-
-```powershell
-$env:DB_PASSWORD="PASSWORD_POSTGRESQL_KAMU"
-```
-
-Ganti `PASSWORD_POSTGRESQL_KAMU` dengan password PostgreSQL yang digunakan.
-
-Opsional, jika konfigurasi PostgreSQL tidak menggunakan nilai default:
-
-```powershell
-$env:DB_HOST="localhost"
-$env:DB_PORT="5432"
-$env:DB_USER="postgres"
-$env:DB_NAME="bab7"
-```
-
-Environment variable tersebut berlaku pada sesi PowerShell yang sedang digunakan.
-
-### Langkah 2 – Memastikan Database Sudah Ada
-
-Buka pgAdmin 4 dan pastikan database `bab7` sudah dibuat.
-
-### Langkah 3 – Mengunduh Dependency
-
-Jalankan perintah:
+### A. Mengunduh Dependency
 
 ```bash
 go mod tidy
 ```
 
-Perintah ini digunakan untuk memastikan seluruh dependency yang dibutuhkan project sudah tersedia.
-
-### Langkah 4 – Menjalankan Program
-
-Jalankan:
+### B. Menjalankan Server
 
 ```bash
-go run .
+go run main.go
 ```
 
-Jika berhasil, akan muncul tampilan seperti berikut:
+Jika berhasil, terminal akan menampilkan:
 
 ```text
 DB berhasil tersambung
@@ -688,58 +527,31 @@ Migrasi berhasil dijalankan: 1 migrasi
 Server berjalan di port :50001
 ```
 
-Keterangan:
-
-- `DB berhasil tersambung`: Go berhasil terhubung ke PostgreSQL.
-- `Migrasi berhasil dijalankan`: Proses migration berhasil dijalankan.
-- `Server berjalan di port :50001`: REST API sudah aktif dan siap menerima permintaan.
-
-Biarkan terminal tetap berjalan selama pengujian API.
-
-### Langkah 5 – Memeriksa Tabel di pgAdmin
-
-Kembali ke pgAdmin 4, kemudian refresh database `bab7`.
-
-Buka struktur berikut:
+Server REST API berjalan pada:
 
 ```text
-bab7
-└── Schemas
-    └── public
-        └── Tables
-            └── servo
+http://localhost:50001
 ```
 
-Jika tabel `servo` sudah muncul, berarti proses migration berhasil.
+Biarkan terminal tetap berjalan selama pengujian Postman.
 
-Untuk melihat struktur tabel, buka Query Tool dan jalankan:
+## 7. Pengujian REST API Menggunakan Postman
 
-```sql
-SELECT * FROM servo;
+### A. POST – Inisialisasi Data Servo
+
+Method:
+
+```http
+POST
 ```
 
-Data awal belum tentu muncul karena data baru dibuat melalui endpoint inisialisasi pada tahap pengujian Postman.
+URL:
 
----
+```text
+http://localhost:50001/servo/init-proj
+```
 
-## 6. Menguji REST API Menggunakan Postman
-
-Pada tahap ini, Postman digunakan untuk mengirim permintaan ke REST API Go.
-
-Pastikan server Go masih berjalan pada port `50001`.
-
-### Pengujian 1 – Membuat Data Awal Servo
-
-Buka Postman.
-
-Atur konfigurasi:
-
-- Method: `POST`
-- URL: `http://localhost:50001/servo/init-proj`
-
-Klik **Send**.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
@@ -747,32 +559,21 @@ Contoh respons:
 }
 ```
 
-Jika berhasil, data awal akan dibuat pada tabel `servo`.
+### B. GET – Melihat Status Servo
 
-Untuk memastikan data sudah masuk, buka Query Tool pada pgAdmin dan jalankan:
+Method:
 
-```sql
-SELECT * FROM servo;
+```http
+GET
 ```
 
-Contoh hasil:
+URL:
 
-| id | status_servo |
-|---|---|
-| 1 | 0 |
+```text
+http://localhost:50001/servo/status
+```
 
-Artinya, data awal servo berhasil dibuat dengan sudut 0 derajat.
-
-### Pengujian 2 – Melihat Status Servo
-
-Pada Postman, atur:
-
-- Method: `GET`
-- URL: `http://localhost:50001/servo/status`
-
-Klik **Send**.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
@@ -785,184 +586,100 @@ Contoh respons:
 }
 ```
 
-Penjelasan:
+### C. PUT – Mengubah Status Servo
 
-- `id`: Identitas data servo.
-- `srv_status`: Nilai sudut motor servo yang tersimpan dalam database.
+Method:
 
-Jika respons tersebut muncul, berarti Go berhasil membaca data dari PostgreSQL.
+```http
+PUT
+```
 
-### Pengujian 3 – Mengubah Sudut Servo Menjadi 90 Derajat
+URL:
 
-Pada Postman, atur:
+```text
+http://localhost:50001/servo/update/1
+```
 
-- Method: `PUT`
-- URL: `http://localhost:50001/servo/update/90`
-
-Klik **Send**.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
     "message": "Sudut servo berhasil diperbarui",
-    "StatusServo": 90
+    "StatusServo": 1
 }
 ```
 
-Artinya, nilai sudut servo berhasil diperbarui menjadi 90 derajat.
+### D. GET – Memastikan Perubahan Data
 
-### Pengujian 4 – Mengubah Sudut Servo Menjadi 180 Derajat
-
-Atur URL:
+Setelah melakukan PUT, jalankan kembali:
 
 ```text
-http://localhost:50001/servo/update/180
+http://localhost:50001/servo/status
 ```
 
-Gunakan method `PUT`, kemudian klik **Send**.
-
-Contoh respons:
+Contoh response:
 
 ```json
 {
-    "message": "Sudut servo berhasil diperbarui",
-    "StatusServo": 180
+    "result": [
+        {
+            "id": 1,
+            "srv_status": 1
+        }
+    ]
 }
 ```
 
-### Pengujian 5 – Mengubah Sudut Servo Menjadi 0 Derajat
+Jika nilai `srv_status` berubah menjadi 1, berarti proses pembaruan data berhasil.
 
-Atur URL:
+## 8. Memeriksa Data PostgreSQL
 
-```text
-http://localhost:50001/servo/update/0
-```
+Buka pgAdmin 4, pilih database `bab7`, kemudian buka Query Tool.
 
-Gunakan method `PUT`, kemudian klik **Send**.
-
-Contoh respons:
-
-```json
-{
-    "message": "Sudut servo berhasil diperbarui",
-    "StatusServo": 0
-}
-```
-
-### Pengujian 6 – Menguji Validasi Nilai Sudut
-
-Untuk memastikan validasi berjalan, coba masukkan nilai di luar rentang yang diperbolehkan.
-
-Contoh:
-
-```text
-PUT http://localhost:50001/servo/update/200
-```
-
-Hasil yang diharapkan:
-
-- HTTP Status: `400 Bad Request`
-
-Respons:
-
-```json
-{
-    "error": "Sudut servo harus antara 0 sampai 180"
-}
-```
-
-Coba juga memasukkan huruf:
-
-```text
-PUT http://localhost:50001/servo/update/abc
-```
-
-Hasil yang diharapkan:
-
-```json
-{
-    "error": "Nilai sudut harus berupa angka"
-}
-```
-
-Pengujian ini memastikan API hanya menerima nilai sudut berupa angka antara 0 sampai 180.
-
-### Langkah 7 – Memastikan Perubahan Data di PostgreSQL
-
-Setelah seluruh pengujian selesai, buka kembali Query Tool pada pgAdmin.
-
-Jalankan:
+Jalankan SQL:
 
 ```sql
 SELECT * FROM servo;
 ```
 
-Contoh hasil jika pengujian terakhir menggunakan sudut 0 derajat:
+Contoh hasil:
 
 | id | status_servo |
 |---|---|
-| 1 | 0 |
+| 1 | 1 |
 
-Nilai `status_servo` akan mengikuti nilai terakhir yang berhasil dikirim melalui Postman.
+Nilai tersebut menunjukkan bahwa data berhasil diperbarui melalui REST API dan tersimpan di PostgreSQL.
 
----
+## 9. Hasil Pengujian
 
-## 7. Alur Kerja Sistem Backend
+Berdasarkan pengujian menggunakan Postman, diperoleh hasil sebagai berikut:
 
-Berikut merupakan alur kerja sistem yang telah dibuat:
+| No. | Method | Endpoint | Hasil |
+|---|---|---|---|
+| 1 | POST | `/servo/init-proj` | Berhasil |
+| 2 | GET | `/servo/status` | Berhasil |
+| 3 | PUT | `/servo/update/1` | Berhasil |
+| 4 | GET | `/servo/status` | Data berhasil diperbarui |
 
-```text
-             Postman
-                |
-                | Mengirim HTTP Request
-                v
-           Go REST API
-                |
-                v
-            Controller
-                |
-                v
-            Repository
-                |
-                | Query SQL
-                v
-           PostgreSQL
-                |
-                | Mengembalikan Data
-                v
-            Repository
-                |
-                v
-            Controller
-                |
-                v
-          JSON Response
-                |
-                v
-             Postman
-```
+Hasil pengujian membuktikan bahwa:
+- Go berhasil terhubung ke PostgreSQL.
+- Database migration berhasil dijalankan.
+- Server Gin berjalan pada port 50001.
+- Data servo berhasil diinisialisasi.
+- Data servo berhasil dibaca.
+- Data servo berhasil diperbarui.
+- Perubahan data tersimpan di PostgreSQL.
 
-Penjelasan:
+## 10. Kesimpulan
 
-1. Postman mengirim permintaan HTTP ke server Go.
-2. Router mengarahkan permintaan menuju controller yang sesuai.
-3. Controller memanggil fungsi repository.
-4. Repository menjalankan perintah SQL ke PostgreSQL.
-5. PostgreSQL menyimpan atau mengembalikan data.
-6. Controller mengirimkan hasil dalam format JSON.
-7. Postman menampilkan respons dari server.
+Project MCS BAB 7 berhasil mengimplementasikan REST API menggunakan Go dan PostgreSQL untuk mengelola data status motor servo.
+
+Go digunakan untuk menangani request HTTP melalui framework Gin, sedangkan PostgreSQL digunakan untuk menyimpan data. Seluruh endpoint telah diuji menggunakan Postman untuk memastikan proses inisialisasi, pembacaan, dan pembaruan data berjalan dengan baik.
+
+Dengan demikian, implementasi backend dan pengujian REST API telah selesai.
 
 ---
 
-## 8. Kesimpulan
+**Repository:** https://github.com/sonysuhadi/MCSbab7
 
-Pada project MCS BAB 7 ini, PostgreSQL digunakan sebagai database untuk menyimpan nilai sudut motor servo. Go digunakan sebagai REST API untuk mengelola komunikasi antara aplikasi dan database.
-
-Dengan menggunakan framework Gin, sistem dapat menyediakan tiga endpoint utama, yaitu untuk inisialisasi data, membaca status servo, dan memperbarui nilai sudut servo.
-
-Pengujian dilakukan menggunakan Postman untuk memastikan seluruh endpoint dapat berjalan dengan baik. Hasil perubahan data juga diperiksa melalui pgAdmin 4.
-
-Dengan demikian, bagian backend telah berhasil dibuat dan diuji. Sistem sudah dapat menerima perintah, memproses data, serta menyimpan perubahan nilai sudut servo ke dalam PostgreSQL.
-
-**Catatan:** Panduan ini berhenti pada tahap pengujian REST API menggunakan Postman. Integrasi ESP32 dan pemrograman Arduino merupakan tahap lanjutan yang tidak dibahas dalam dokumen ini.
+**MCS BAB 7 – Go REST API & PostgreSQL**
