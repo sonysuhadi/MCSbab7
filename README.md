@@ -1,28 +1,33 @@
 # MCS BAB 7 – Kontrol Motor Servo Menggunakan ESP32, Go, dan PostgreSQL
 
-Project ini menggunakan ESP32 untuk mengontrol motor servo melalui REST API Go. Nilai sudut servo disimpan di PostgreSQL dan dibaca oleh ESP32 secara berkala.
-
 ## 1. Persiapan
 
-Pastikan software dan perangkat berikut sudah tersedia:
+Project ini menggunakan bahasa pemrograman Go sebagai REST API dan PostgreSQL sebagai database untuk menyimpan nilai sudut motor servo.
 
-**Software:**
+Pengujian dilakukan menggunakan Postman untuk mengirim perintah, membaca status, dan memperbarui nilai sudut servo.
+
+### Software yang dibutuhkan
+
 - Go
 - PostgreSQL
 - pgAdmin 4
 - Visual Studio Code
 - Postman
-- Arduino IDE
 
-**Perangkat:**
+### Perangkat yang digunakan pada keseluruhan project
+
 - ESP32
 - Motor Servo SG90
 - Kabel jumper
 - Sumber daya 5V untuk servo
 
+**Catatan:** Panduan ini hanya membahas backend Go, PostgreSQL, dan pengujian API menggunakan Postman. Pemrograman Arduino dan ESP32 tidak termasuk dalam pembahasan.
+
+---
+
 ## 2. Membuat Database PostgreSQL
 
-Pada tahap ini kita membuat database menggunakan pgAdmin 4.
+Pada tahap ini, kita akan membuat database menggunakan pgAdmin 4.
 
 ### Langkah 1 – Membuka pgAdmin 4
 
@@ -36,7 +41,7 @@ Pada tahap ini kita membuat database menggunakan pgAdmin 4.
 1. Klik kanan pada menu **Databases**.
 2. Pilih **Create**.
 3. Klik **Database**.
-4. Isi nama database dengan:
+4. Masukkan nama database:
 
 ```text
 bab7
@@ -44,8 +49,6 @@ bab7
 
 5. Pada bagian Owner, pilih `postgres`.
 6. Klik **Save**.
-
-Database `bab7` sekarang sudah dibuat.
 
 ### Langkah 3 – Memastikan Database Berhasil Dibuat
 
@@ -66,15 +69,17 @@ Jika database `bab7` muncul, berarti proses pembuatan database berhasil.
 2. Klik kanan pada database tersebut.
 3. Pilih **Query Tool**.
 
-Query Tool digunakan untuk menjalankan perintah SQL.
+Query Tool digunakan untuk menjalankan perintah SQL dan memeriksa isi database.
 
-> Tabel `servo` tidak perlu dibuat secara manual karena akan dibuat otomatis oleh program Go melalui proses migrasi.
+**Catatan:** Tabel `servo` tidak perlu dibuat secara manual karena akan dibuat otomatis oleh program Go melalui proses database migration.
+
+---
 
 ## 3. Membuat Project Go
 
 ### Langkah 1 – Membuat Folder Project
 
-Buka terminal atau PowerShell, lalu jalankan:
+Buka terminal atau PowerShell, kemudian jalankan:
 
 ```powershell
 mkdir bab7
@@ -83,11 +88,17 @@ cd bab7
 
 ### Langkah 2 – Inisialisasi Project
 
+Jalankan perintah:
+
 ```bash
 go mod init bab7
 ```
 
-### Langkah 3 – Install Library
+Perintah tersebut digunakan untuk membuat file `go.mod` sebagai identitas module project Go.
+
+### Langkah 3 – Menginstal Library
+
+Jalankan perintah berikut:
 
 ```bash
 go get github.com/gin-gonic/gin
@@ -95,32 +106,48 @@ go get github.com/lib/pq
 go get github.com/rubenv/sql-migrate
 ```
 
+Fungsi masing-masing library:
+
+- `gin-gonic/gin`: Membuat REST API dan mengatur routing.
+- `lib/pq`: Driver untuk menghubungkan Go dengan PostgreSQL.
+- `sql-migrate`: Mengelola pembuatan dan perubahan struktur database melalui migration.
+
 ### Langkah 4 – Membuat Struktur Folder
 
-Buat folder dan file berikut:
+Buat struktur folder dan file seperti berikut:
 
 ```text
 bab7/
+│
 ├── controllers/
 │   └── servo_controller.go
+│
 ├── database/
 │   ├── sql_migrations/
 │   │   └── 1_initiate.sql
 │   └── database.go
+│
 ├── entities/
 │   └── servo_entity.go
+│
 ├── repositories/
 │   └── servo_repo.go
+│
 ├── routers/
 │   └── servo_router.go
+│
 ├── go.mod
 ├── go.sum
 └── main.go
 ```
 
+Setiap folder memiliki fungsi masing-masing untuk memisahkan proses pengelolaan data, koneksi database, pengaturan API, dan struktur data.
+
+---
+
 ## 4. Memasukkan Kode Program Go
 
-Masukkan kode berikut sesuai nama file masing-masing.
+Masukkan kode berikut sesuai dengan nama file masing-masing.
 
 ### A. `entities/servo_entity.go`
 
@@ -133,7 +160,14 @@ type Servo struct {
 }
 ```
 
-Fungsi: Menentukan struktur data servo yang terdiri dari ID dan nilai sudut servo.
+**Fungsi:**
+
+File ini digunakan untuk menentukan struktur data servo yang terdiri dari:
+
+- `Id`: Identitas data servo.
+- `StatusServo`: Nilai sudut motor servo.
+
+Tag JSON digunakan agar nama field yang dikirim melalui API sesuai dengan format JSON.
 
 ### B. `database/database.go`
 
@@ -154,6 +188,7 @@ var dbMigrations embed.FS
 var DbConnection *sql.DB
 
 func DBMigrations(dbParam *sql.DB) error {
+
     migrations := &migrate.EmbedFileSystemMigrationSource{
         FileSystem: dbMigrations,
         Root:       "sql_migrations",
@@ -173,11 +208,23 @@ func DBMigrations(dbParam *sql.DB) error {
     DbConnection = dbParam
 
     fmt.Printf("Migrasi berhasil dijalankan: %d migrasi\n", n)
+
     return nil
 }
 ```
 
-Fungsi: Menghubungkan proses migrasi dengan database PostgreSQL. File SQL yang ada di folder `sql_migrations` akan dijalankan secara otomatis.
+**Fungsi:**
+
+File ini digunakan untuk menghubungkan proses migration dengan database PostgreSQL.
+
+Penjelasan:
+
+- `embed`: Memasukkan file SQL migration ke dalam program Go.
+- `dbMigrations`: Menyimpan file migration.
+- `DbConnection`: Menyimpan koneksi database yang digunakan oleh aplikasi.
+- `migrate.Exec()`: Menjalankan proses migration secara otomatis.
+
+Dengan demikian, tabel database dapat dibuat tanpa harus menjalankan perintah SQL secara manual setiap kali project dijalankan.
 
 ### C. `database/sql_migrations/1_initiate.sql`
 
@@ -187,13 +234,39 @@ Fungsi: Menghubungkan proses migrasi dengan database PostgreSQL. File SQL yang a
 
 CREATE TABLE servo (
     id INTEGER PRIMARY KEY,
-    status_servo INTEGER
+    status_servo INTEGER NOT NULL DEFAULT 0
+        CHECK (status_servo >= 0 AND status_servo <= 180)
 );
+
+-- +migrate StatementEnd
+
+
+-- +migrate Down
+-- +migrate StatementBegin
+
+DROP TABLE servo;
 
 -- +migrate StatementEnd
 ```
 
-Fungsi: Membuat tabel `servo` untuk menyimpan ID dan nilai sudut motor servo.
+**Fungsi:**
+
+File ini digunakan untuk membuat tabel `servo` di PostgreSQL.
+
+Penjelasan struktur tabel:
+
+| Kolom | Tipe Data | Fungsi |
+|---|---|---|
+| id | INTEGER | Identitas data servo |
+| status_servo | INTEGER | Menyimpan nilai sudut servo |
+
+Keterangan tambahan:
+
+- `PRIMARY KEY`: Menentukan kolom ID sebagai identitas utama.
+- `DEFAULT 0`: Memberikan nilai awal sudut servo sebesar 0.
+- `CHECK`: Membatasi nilai sudut antara 0 sampai 180 derajat.
+- `Up`: Menjalankan pembuatan tabel.
+- `Down`: Menghapus tabel ketika migration dibatalkan.
 
 ### D. `repositories/servo_repo.go`
 
@@ -203,51 +276,100 @@ package repositories
 import (
     "bab7/entities"
     "database/sql"
+    "errors"
 )
 
-func InitProj(db *sql.DB) (err error) {
-    query := "INSERT INTO servo (id, status_servo) VALUES (1, 0) ON CONFLICT (id) DO NOTHING"
-    _, err = db.Exec(query)
+func InitProj(db *sql.DB) error {
+
+    query := `
+        INSERT INTO servo (id, status_servo)
+        VALUES (1, 0)
+        ON CONFLICT (id) DO NOTHING
+    `
+
+    _, err := db.Exec(query)
+
     return err
 }
 
-func GetStatus(db *sql.DB) (result []entities.Servo, err error) {
-    query := "SELECT id, status_servo FROM servo"
+func GetStatus(db *sql.DB) ([]entities.Servo, error) {
+
+    query := `
+        SELECT id, status_servo
+        FROM servo
+        ORDER BY id
+    `
+
     rows, err := db.Query(query)
 
     if err != nil {
-        return
+        return nil, err
     }
 
     defer rows.Close()
 
+    var result []entities.Servo
+
     for rows.Next() {
+
         var data entities.Servo
 
-        err = rows.Scan(&data.Id, &data.StatusServo)
+        err = rows.Scan(
+            &data.Id,
+            &data.StatusServo,
+        )
 
         if err != nil {
-            return
+            return nil, err
         }
 
         result = append(result, data)
     }
 
-    err = rows.Err()
-    return
+    if err = rows.Err(); err != nil {
+        return nil, err
+    }
+
+    return result, nil
 }
 
-func UpdateStatus(db *sql.DB, status entities.Servo) (err error) {
-    query := "UPDATE servo SET status_servo = $1 WHERE id = 1"
-    _, err = db.Exec(query, status.StatusServo)
-    return
+func UpdateStatus(db *sql.DB, status entities.Servo) error {
+
+    query := `
+        UPDATE servo
+        SET status_servo = $1
+        WHERE id = 1
+    `
+
+    result, err := db.Exec(query, status.StatusServo)
+
+    if err != nil {
+        return err
+    }
+
+    affected, err := result.RowsAffected()
+
+    if err != nil {
+        return err
+    }
+
+    if affected == 0 {
+        return errors.New("data servo belum diinisialisasi")
+    }
+
+    return nil
 }
 ```
 
-Fungsi:
-- `InitProj()`: Membuat data awal servo dengan sudut 0.
-- `GetStatus()`: Mengambil nilai sudut servo dari database.
-- `UpdateStatus()`: Memperbarui nilai sudut servo di database.
+**Fungsi:**
+
+Repository merupakan bagian yang bertanggung jawab untuk berkomunikasi langsung dengan database.
+
+Terdapat tiga fungsi utama:
+
+1. `InitProj()`: Membuat data awal servo dengan ID 1 dan sudut 0. Jika data sudah tersedia, data tidak dibuat ulang.
+2. `GetStatus()`: Mengambil data ID dan nilai sudut servo dari database.
+3. `UpdateStatus()`: Memperbarui nilai sudut servo pada database.
 
 ### E. `controllers/servo_controller.go`
 
@@ -265,48 +387,99 @@ import (
 )
 
 func InitProj(c *gin.Context) {
+
     err := repositories.InitProj(database.DbConnection)
 
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{})
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Data servo berhasil diinisialisasi",
+    })
 }
 
 func GetStatus(c *gin.Context) {
-    var result gin.H
 
     status, err := repositories.GetStatus(database.DbConnection)
 
     if err != nil {
-        result = gin.H{"result": err.Error()}
-    } else {
-        result = gin.H{"result": status}
-    }
-
-    c.JSON(http.StatusOK, result)
-}
-
-func UpdateStatus(c *gin.Context) {
-    var status entities.Servo
-
-    srv_status, _ := strconv.Atoi(c.Param("srv_status"))
-    status.StatusServo = srv_status
-
-    err := repositories.UpdateStatus(database.DbConnection, status)
-
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{"StatusServo": status.StatusServo})
+    c.JSON(http.StatusOK, gin.H{
+        "result": status,
+    })
+}
+
+func UpdateStatus(c *gin.Context) {
+
+    srvStatus, err := strconv.Atoi(c.Param("srv_status"))
+
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": "Nilai sudut harus berupa angka",
+        })
+        return
+    }
+
+    if srvStatus < 0 || srvStatus > 180 {
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": "Sudut servo harus antara 0 sampai 180",
+        })
+        return
+    }
+
+    status := entities.Servo{
+        StatusServo: srvStatus,
+    }
+
+    err = repositories.UpdateStatus(
+        database.DbConnection,
+        status,
+    )
+
+    if err != nil {
+
+        if err.Error() == "data servo belum diinisialisasi" {
+            c.JSON(http.StatusNotFound, gin.H{
+                "error": err.Error(),
+            })
+            return
+        }
+
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message":      "Sudut servo berhasil diperbarui",
+        "StatusServo": status.StatusServo,
+    })
 }
 ```
 
-Fungsi: Mengatur permintaan dari pengguna, memanggil repository, dan mengirimkan hasil dalam format JSON.
+**Fungsi:**
+
+Controller bertugas menerima permintaan dari pengguna, memanggil repository, dan mengirimkan hasil dalam format JSON.
+
+Terdapat tiga fungsi:
+
+- `InitProj()`: Memanggil proses pembuatan data awal.
+- `GetStatus()`: Mengambil status servo dari database.
+- `UpdateStatus()`: Menerima dan memperbarui nilai sudut servo.
+
+Pada bagian `UpdateStatus()`, terdapat validasi agar nilai yang dikirim hanya berupa angka antara 0 sampai 180.
+
+Jika nilai tidak sesuai, API akan mengembalikan pesan kesalahan dengan HTTP 400.
 
 ### F. `routers/servo_router.go`
 
@@ -320,17 +493,39 @@ import (
 )
 
 func StartServer() *gin.Engine {
+
     routers := gin.Default()
 
-    routers.POST("/servo/init-proj", controllers.InitProj)
-    routers.GET("/servo/status", controllers.GetStatus)
-    routers.PUT("/servo/update/:srv_status", controllers.UpdateStatus)
+    routers.POST(
+        "/servo/init-proj",
+        controllers.InitProj,
+    )
+
+    routers.GET(
+        "/servo/status",
+        controllers.GetStatus,
+    )
+
+    routers.PUT(
+        "/servo/update/:srv_status",
+        controllers.UpdateStatus,
+    )
 
     return routers
 }
 ```
 
-Fungsi: Menentukan tiga alamat API untuk membuat data awal, membaca status, dan memperbarui sudut servo.
+**Fungsi:**
+
+File router digunakan untuk menentukan alamat API dan menghubungkannya dengan controller.
+
+Terdapat tiga endpoint:
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| POST | `/servo/init-proj` | Membuat data awal |
+| GET | `/servo/status` | Melihat status servo |
+| PUT | `/servo/update/:srv_status` | Memperbarui sudut servo |
 
 ### G. `main.go`
 
@@ -341,6 +536,9 @@ import (
     "database/sql"
     "fmt"
     "log"
+    "net"
+    "net/url"
+    "os"
 
     "bab7/database"
     "bab7/routers"
@@ -348,27 +546,46 @@ import (
     _ "github.com/lib/pq"
 )
 
-const (
-    host     = "localhost"
-    port     = 5432
-    user     = "postgres"
-    password = "PASSWORD_POSTGRESQL_KAMU"
-    dbName   = "bab7"
-)
+func getEnv(key, fallback string) string {
+
+    value := os.Getenv(key)
+
+    if value == "" {
+        return fallback
+    }
+
+    return value
+}
 
 func main() {
-    PORT := ":50001"
 
-    psqlInfo := fmt.Sprintf(
-        "host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-        host,
-        port,
-        user,
-        password,
-        dbName,
-    )
+    dbHost := getEnv("DB_HOST", "localhost")
+    dbPort := getEnv("DB_PORT", "5432")
+    dbUser := getEnv("DB_USER", "postgres")
+    dbName := getEnv("DB_NAME", "bab7")
+    dbPassword := os.Getenv("DB_PASSWORD")
 
-    DB, err := sql.Open("postgres", psqlInfo)
+    if dbPassword == "" {
+        log.Fatal("Environment variable DB_PASSWORD belum diatur")
+    }
+
+    port := ":50001"
+
+    dbURL := url.URL{
+        Scheme: "postgres",
+        User: url.UserPassword(
+            dbUser,
+            dbPassword,
+        ),
+        Host: net.JoinHostPort(dbHost, dbPort),
+        Path: dbName,
+    }
+
+    query := dbURL.Query()
+    query.Set("sslmode", "disable")
+    dbURL.RawQuery = query.Encode()
+
+    DB, err := sql.Open("postgres", dbURL.String())
 
     if err != nil {
         log.Fatal("Gagal membuka koneksi database:", err)
@@ -390,9 +607,9 @@ func main() {
         log.Fatal("Migrasi gagal:", err)
     }
 
-    fmt.Println("Server berjalan di port ", PORT)
+    fmt.Println("Server berjalan di port", port)
 
-    err = routers.StartServer().Run(PORT)
+    err = routers.StartServer().Run(port)
 
     if err != nil {
         log.Fatal("Server gagal dijalankan:", err)
@@ -400,24 +617,70 @@ func main() {
 }
 ```
 
-**Penting:** Ganti `PASSWORD_POSTGRESQL_KAMU` dengan password PostgreSQL milik sendiri. Jangan masukkan password asli ke GitHub publik. Kode ini adalah contoh konfigurasi untuk README; sesuaikan dengan konfigurasi `main.go` yang digunakan pada project.
+**Fungsi:**
 
-## 5. Menjalankan dan Menguji API
+File `main.go` merupakan program utama yang menjalankan seluruh proses aplikasi.
 
-### Langkah 1 – Memastikan Database Sudah Ada
+Tahapan yang dilakukan:
 
-Buka pgAdmin 4 dan pastikan database `bab7` sudah muncul.
+1. Membaca konfigurasi database dari environment variable.
+2. Membuat koneksi ke PostgreSQL.
+3. Memastikan koneksi database berhasil melalui `DB.Ping()`.
+4. Menjalankan database migration.
+5. Menjalankan REST API menggunakan Gin pada port `50001`.
 
-### Langkah 2 – Menjalankan Program
+**Penting:** Password PostgreSQL tidak ditulis langsung di dalam kode program. Password dibaca melalui environment variable `DB_PASSWORD` agar tidak mudah terekspos ketika project dibagikan atau diunggah ke GitHub.
 
-Buka terminal di folder project, kemudian jalankan:
+---
+
+## 5. Menjalankan dan Menguji Program Go
+
+### Langkah 1 – Mengatur Password PostgreSQL
+
+Sebelum menjalankan program, buka PowerShell pada folder project.
+
+Masukkan perintah:
+
+```powershell
+$env:DB_PASSWORD="PASSWORD_POSTGRESQL_KAMU"
+```
+
+Ganti `PASSWORD_POSTGRESQL_KAMU` dengan password PostgreSQL yang digunakan.
+
+Opsional, jika konfigurasi PostgreSQL tidak menggunakan nilai default:
+
+```powershell
+$env:DB_HOST="localhost"
+$env:DB_PORT="5432"
+$env:DB_USER="postgres"
+$env:DB_NAME="bab7"
+```
+
+Environment variable tersebut berlaku pada sesi PowerShell yang sedang digunakan.
+
+### Langkah 2 – Memastikan Database Sudah Ada
+
+Buka pgAdmin 4 dan pastikan database `bab7` sudah dibuat.
+
+### Langkah 3 – Mengunduh Dependency
+
+Jalankan perintah:
 
 ```bash
 go mod tidy
-go run main.go
 ```
 
-Jika berhasil, akan muncul:
+Perintah ini digunakan untuk memastikan seluruh dependency yang dibutuhkan project sudah tersedia.
+
+### Langkah 4 – Menjalankan Program
+
+Jalankan:
+
+```bash
+go run .
+```
+
+Jika berhasil, akan muncul tampilan seperti berikut:
 
 ```text
 DB berhasil tersambung
@@ -425,16 +688,19 @@ Migrasi berhasil dijalankan: 1 migrasi
 Server berjalan di port :50001
 ```
 
-Artinya:
-- Go berhasil terhubung ke PostgreSQL.
-- Migrasi berhasil membuat tabel `servo`.
-- Server API berjalan pada port `50001`.
+Keterangan:
 
-### Langkah 3 – Memeriksa Tabel di pgAdmin
+- `DB berhasil tersambung`: Go berhasil terhubung ke PostgreSQL.
+- `Migrasi berhasil dijalankan`: Proses migration berhasil dijalankan.
+- `Server berjalan di port :50001`: REST API sudah aktif dan siap menerima permintaan.
+
+Biarkan terminal tetap berjalan selama pengujian API.
+
+### Langkah 5 – Memeriksa Tabel di pgAdmin
 
 Kembali ke pgAdmin 4, kemudian refresh database `bab7`.
 
-Buka:
+Buka struktur berikut:
 
 ```text
 bab7
@@ -444,29 +710,67 @@ bab7
             └── servo
 ```
 
-Jika tabel `servo` sudah muncul, berarti migrasi berhasil.
+Jika tabel `servo` sudah muncul, berarti proses migration berhasil.
 
-Untuk melihat isi tabel, buka Query Tool dan jalankan:
+Untuk melihat struktur tabel, buka Query Tool dan jalankan:
 
 ```sql
 SELECT * FROM servo;
 ```
 
-Data awal akan dibuat pada tahap pengujian API.
+Data awal belum tentu muncul karena data baru dibuat melalui endpoint inisialisasi pada tahap pengujian Postman.
 
-### Langkah 4 – Menguji API dengan Postman
+---
 
-Pastikan server Go masih berjalan.
+## 6. Menguji REST API Menggunakan Postman
 
-**Membuat data awal**
+Pada tahap ini, Postman digunakan untuk mengirim permintaan ke REST API Go.
+
+Pastikan server Go masih berjalan pada port `50001`.
+
+### Pengujian 1 – Membuat Data Awal Servo
+
+Buka Postman.
+
+Atur konfigurasi:
 
 - Method: `POST`
 - URL: `http://localhost:50001/servo/init-proj`
 
-**Melihat status servo**
+Klik **Send**.
+
+Contoh respons:
+
+```json
+{
+    "message": "Data servo berhasil diinisialisasi"
+}
+```
+
+Jika berhasil, data awal akan dibuat pada tabel `servo`.
+
+Untuk memastikan data sudah masuk, buka Query Tool pada pgAdmin dan jalankan:
+
+```sql
+SELECT * FROM servo;
+```
+
+Contoh hasil:
+
+| id | status_servo |
+|---|---|
+| 1 | 0 |
+
+Artinya, data awal servo berhasil dibuat dengan sudut 0 derajat.
+
+### Pengujian 2 – Melihat Status Servo
+
+Pada Postman, atur:
 
 - Method: `GET`
 - URL: `http://localhost:50001/servo/status`
+
+Klik **Send**.
 
 Contoh respons:
 
@@ -481,250 +785,184 @@ Contoh respons:
 }
 ```
 
-**Mengubah sudut servo**
+Penjelasan:
+
+- `id`: Identitas data servo.
+- `srv_status`: Nilai sudut motor servo yang tersimpan dalam database.
+
+Jika respons tersebut muncul, berarti Go berhasil membaca data dari PostgreSQL.
+
+### Pengujian 3 – Mengubah Sudut Servo Menjadi 90 Derajat
+
+Pada Postman, atur:
 
 - Method: `PUT`
 - URL: `http://localhost:50001/servo/update/90`
+
+Klik **Send**.
 
 Contoh respons:
 
 ```json
 {
+    "message": "Sudut servo berhasil diperbarui",
     "StatusServo": 90
 }
 ```
 
-Coba juga nilai `0`, `45`, dan `180`.
+Artinya, nilai sudut servo berhasil diperbarui menjadi 90 derajat.
 
-Setelah mengubah nilai, jalankan kembali:
+### Pengujian 4 – Mengubah Sudut Servo Menjadi 180 Derajat
+
+Atur URL:
+
+```text
+http://localhost:50001/servo/update/180
+```
+
+Gunakan method `PUT`, kemudian klik **Send**.
+
+Contoh respons:
+
+```json
+{
+    "message": "Sudut servo berhasil diperbarui",
+    "StatusServo": 180
+}
+```
+
+### Pengujian 5 – Mengubah Sudut Servo Menjadi 0 Derajat
+
+Atur URL:
+
+```text
+http://localhost:50001/servo/update/0
+```
+
+Gunakan method `PUT`, kemudian klik **Send**.
+
+Contoh respons:
+
+```json
+{
+    "message": "Sudut servo berhasil diperbarui",
+    "StatusServo": 0
+}
+```
+
+### Pengujian 6 – Menguji Validasi Nilai Sudut
+
+Untuk memastikan validasi berjalan, coba masukkan nilai di luar rentang yang diperbolehkan.
+
+Contoh:
+
+```text
+PUT http://localhost:50001/servo/update/200
+```
+
+Hasil yang diharapkan:
+
+- HTTP Status: `400 Bad Request`
+
+Respons:
+
+```json
+{
+    "error": "Sudut servo harus antara 0 sampai 180"
+}
+```
+
+Coba juga memasukkan huruf:
+
+```text
+PUT http://localhost:50001/servo/update/abc
+```
+
+Hasil yang diharapkan:
+
+```json
+{
+    "error": "Nilai sudut harus berupa angka"
+}
+```
+
+Pengujian ini memastikan API hanya menerima nilai sudut berupa angka antara 0 sampai 180.
+
+### Langkah 7 – Memastikan Perubahan Data di PostgreSQL
+
+Setelah seluruh pengujian selesai, buka kembali Query Tool pada pgAdmin.
+
+Jalankan:
 
 ```sql
 SELECT * FROM servo;
 ```
 
-Nilai `status_servo` seharusnya mengikuti nilai terakhir yang dikirim melalui Postman.
+Contoh hasil jika pengujian terakhir menggunakan sudut 0 derajat:
 
-## 6. Menghubungkan ESP32 dengan Motor Servo
-
-### Langkah 1 – Merangkai Komponen
-
-Hubungkan motor servo SG90 ke ESP32:
-
-| Kabel Servo | Sambungan |
+| id | status_servo |
 |---|---|
-| Merah (VCC) | Sumber daya 5V |
-| Cokelat/Hitam (GND) | GND |
-| Oranye/Kuning (Signal) | GPIO 13 |
+| 1 | 0 |
 
-Gunakan sumber daya 5V yang sesuai untuk servo. Satukan GND sumber daya servo dengan GND ESP32.
+Nilai `status_servo` akan mengikuti nilai terakhir yang berhasil dikirim melalui Postman.
 
-### Langkah 2 – Menginstal Library Arduino
+---
 
-Buka Arduino IDE, pilih **Library Manager**, lalu instal:
+## 7. Alur Kerja Sistem Backend
 
-- ESP32Servo
-- ArduinoJson
-
-Library WiFi dan HTTPClient sudah tersedia melalui paket board ESP32.
-
-### Langkah 3 – Mengetahui IP Address Komputer
-
-ESP32 harus mengakses IP komputer tempat server Go berjalan.
-
-Buka Command Prompt, lalu ketik:
-
-```bash
-ipconfig
-```
-
-Cari bagian `IPv4 Address` pada koneksi WiFi atau Ethernet yang sedang digunakan.
-
-Contoh:
+Berikut merupakan alur kerja sistem yang telah dibuat:
 
 ```text
-IPv4 Address: 192.168.1.50
+             Postman
+                |
+                | Mengirim HTTP Request
+                v
+           Go REST API
+                |
+                v
+            Controller
+                |
+                v
+            Repository
+                |
+                | Query SQL
+                v
+           PostgreSQL
+                |
+                | Mengembalikan Data
+                v
+            Repository
+                |
+                v
+            Controller
+                |
+                v
+          JSON Response
+                |
+                v
+             Postman
 ```
 
-Pastikan komputer dan ESP32 menggunakan jaringan yang sama.
+Penjelasan:
 
-### Langkah 4 – Program ESP32
+1. Postman mengirim permintaan HTTP ke server Go.
+2. Router mengarahkan permintaan menuju controller yang sesuai.
+3. Controller memanggil fungsi repository.
+4. Repository menjalankan perintah SQL ke PostgreSQL.
+5. PostgreSQL menyimpan atau mengembalikan data.
+6. Controller mengirimkan hasil dalam format JSON.
+7. Postman menampilkan respons dari server.
 
-Masukkan kode berikut ke Arduino IDE.
+---
 
-Ganti nama WiFi, password WiFi, dan IP server sesuai jaringan yang digunakan.
+## 8. Kesimpulan
 
-```cpp
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <ESP32Servo.h>
+Pada project MCS BAB 7 ini, PostgreSQL digunakan sebagai database untuk menyimpan nilai sudut motor servo. Go digunakan sebagai REST API untuk mengelola komunikasi antara aplikasi dan database.
 
-const char* ssid = "NAMA_WIFI_ANDA";
-const char* password = "PASSWORD_WIFI_ANDA";
+Dengan menggunakan framework Gin, sistem dapat menyediakan tiga endpoint utama, yaitu untuk inisialisasi data, membaca status servo, dan memperbarui nilai sudut servo.
 
-const char* serverUrl =
-    "http://192.168.1.50:50001/servo/status";
+Pengujian dilakukan menggunakan Postman untuk memastikan seluruh endpoint dapat berjalan dengan baik. Hasil perubahan data juga diperiksa melalui pgAdmin 4.
 
-Servo myServo;
+Dengan demikian, bagian backend telah berhasil dibuat dan diuji. Sistem sudah dapat menerima perintah, memproses data, serta menyimpan perubahan nilai sudut servo ke dalam PostgreSQL.
 
-const int servoPin = 13;
-int lastAngle = -1;
-
-void setup() {
-    Serial.begin(115200);
-
-    myServo.setPeriodHertz(50);
-    myServo.attach(servoPin, 500, 2400);
-
-    WiFi.begin(ssid, password);
-
-    Serial.print("Menghubungkan WiFi");
-
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println();
-    Serial.println("WiFi berhasil terhubung");
-
-    Serial.print("IP ESP32: ");
-    Serial.println(WiFi.localIP());
-}
-
-void loop() {
-    if (WiFi.status() == WL_CONNECTED) {
-
-        HTTPClient http;
-
-        http.begin(serverUrl);
-        http.setTimeout(5000);
-
-        int httpCode = http.GET();
-
-        if (httpCode == HTTP_CODE_OK) {
-
-            String payload = http.getString();
-
-            Serial.println("Data dari server:");
-            Serial.println(payload);
-
-            DynamicJsonDocument doc(1024);
-
-            DeserializationError error =
-                deserializeJson(doc, payload);
-
-            if (!error) {
-
-                int targetAngle =
-                    doc["result"][0]["srv_status"] | 0;
-
-                targetAngle = constrain(targetAngle, 0, 180);
-
-                if (targetAngle != lastAngle) {
-
-                    myServo.write(targetAngle);
-
-                    lastAngle = targetAngle;
-
-                    Serial.print("Sudut servo: ");
-                    Serial.println(targetAngle);
-                }
-
-            } else {
-                Serial.println("Gagal membaca JSON");
-            }
-
-        } else {
-            Serial.print("HTTP Error: ");
-            Serial.println(httpCode);
-        }
-
-        http.end();
-
-    } else {
-        Serial.println("WiFi terputus");
-    }
-
-    delay(2000);
-}
-```
-
-### Langkah 5 – Upload Program
-
-1. Hubungkan ESP32 ke komputer.
-2. Pilih board ESP32 di Arduino IDE.
-3. Pilih port ESP32.
-4. Klik Upload.
-5. Setelah selesai, buka Serial Monitor.
-6. Atur baud rate menjadi `115200`.
-
-Jika berhasil, akan muncul pesan:
-
-```text
-Menghubungkan WiFi...
-WiFi berhasil terhubung
-IP ESP32: 192.168.1.100
-```
-
-## 7. Pengujian Akhir
-
-Pastikan server Go masih berjalan dan ESP32 sudah terhubung ke WiFi.
-
-### Pengujian 1 – Menggerakkan Servo ke 180 Derajat
-
-Buka Postman, kemudian kirim:
-
-```http
-PUT http://localhost:50001/servo/update/180
-```
-
-ESP32 akan membaca data terbaru dari API dan menggerakkan servo menuju 180 derajat.
-
-### Pengujian 2 – Menggerakkan Servo ke 0 Derajat
-
-```http
-PUT http://localhost:50001/servo/update/0
-```
-
-Servo akan bergerak menuju 0 derajat.
-
-### Pengujian 3 – Menggerakkan Servo ke 90 Derajat
-
-```http
-PUT http://localhost:50001/servo/update/90
-```
-
-Servo akan bergerak menuju 90 derajat.
-
-ESP32 membaca data dari server setiap 2 detik, sehingga perubahan sudut tidak harus dilakukan dengan mengunggah ulang program.
-
-### Alur Kerja Sistem
-
-```text
-Postman
-   |
-   | Mengirim sudut servo
-   v
-Go REST API
-   |
-   | Menyimpan data
-   v
-PostgreSQL
-   |
-   | Data dibaca melalui API
-   v
-ESP32
-   |
-   | Mengatur sudut servo
-   v
-Motor Servo
-```
-
-**Kesimpulan**
-
-Pada project ini, PostgreSQL digunakan untuk menyimpan nilai sudut motor servo. Go digunakan sebagai REST API untuk membaca dan memperbarui data. ESP32 mengambil data dari API melalui koneksi WiFi, kemudian menggerakkan motor servo sesuai nilai sudut yang tersimpan.
-
-Dengan demikian, perubahan sudut motor servo dapat dilakukan melalui Postman tanpa perlu mengunggah ulang program ESP32.
-
-**Catatan:** Gunakan nilai sudut 0–180 saat pengujian. Program backend contoh ini belum memvalidasi rentang nilai tersebut, sedangkan program ESP32 membatasi perintah gerakan dengan `constrain()`.
+**Catatan:** Panduan ini berhenti pada tahap pengujian REST API menggunakan Postman. Integrasi ESP32 dan pemrograman Arduino merupakan tahap lanjutan yang tidak dibahas dalam dokumen ini.
